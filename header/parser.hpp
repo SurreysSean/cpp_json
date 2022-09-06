@@ -15,6 +15,7 @@ protected:
     parseResult parse_null();
     parseResult parse_false();
     parseResult parse_true();
+    parseResult parse_number();
     parseResult parse_value();
 
 public:

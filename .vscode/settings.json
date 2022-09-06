@@ -6,6 +6,9 @@
         "fstream": "cpp",
         "ostream": "cpp",
         "limits": "cpp",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "cctype": "cpp",
+        "cassert": "cpp",
+        "climits": "cpp"
     }
 }
