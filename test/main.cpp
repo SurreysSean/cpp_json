@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <cstring>
 #include <climits>
 
 #include "parser.hpp"
@@ -9,59 +10,57 @@ int test_count = 0;
 
 using std::string;
 template <typename T>
-void expect_eq_base(bool equality, T test, T expect, int callerLine)
+void expect_eq(const T &expect, const T &test, int callerLine)
 {
     ++test_count;
-    if (equality)
+    if (test == expect)
         ++pass_count;
     else
-        std::cerr << __FILE__ << ": " << callerLine << ": expect: " << expect << ",actual: " << test << "\n";
-}
-
-void expect_eq_int(int expect, int test, int callerLine)
-{
-    expect_eq_base(test == expect, test, expect, callerLine);
-}
-
-void expect_eq_double(double expect, double test, int callerLine)
-{
-    expect_eq_base(expect == test, test, expect, callerLine);
+        std::cerr << __FILE__ << " : line " << callerLine << " :\n\texpect: " << expect << ",actual: " << test << "\n";
 }
 
 void test_number(double expect, const string &jsonText, int callerLine)
 {
     jsonParser parser;
-    expect_eq_int(PARSE_OK, parser.parse(jsonText), callerLine);
-    expect_eq_int(json_number, parser.getResult()->getType(), callerLine);
-    expect_eq_double(expect, parser.getResult()->getNumber(), callerLine);
+    expect_eq(PARSE_OK, parser.parse(jsonText), callerLine);
+    expect_eq(json_number, parser.getResult().getType(), callerLine);
+    expect_eq(expect, parser.getResult().getNum(), callerLine);
 }
 
-void test_error(int expect, const string &text, int callerLine)
+void test_string(const string &expect, const string &jsonText, int callerLine)
+{
+
+    jsonParser parser;
+    expect_eq(PARSE_OK, parser.parse(jsonText), callerLine);
+    expect_eq(json_string, parser.getResult().getType(), callerLine);
+    expect_eq(expect, parser.getResult().getStr(), callerLine);
+}
+void test_error(parseResult expect, const string &text, int callerLine)
 {
     jsonParser parser;
-    expect_eq_int(expect, parser.parse(text), callerLine);
-    expect_eq_int(json_null, parser.getResult()->getType(), callerLine);
+    expect_eq(expect, parser.parse(text), callerLine);
+    expect_eq(json_null, parser.getResult().getType(), callerLine);
 }
 
 void test_parse_null()
 {
     jsonParser parser;
-    expect_eq_int(PARSE_OK, parser.parse("null"), __LINE__);
-    expect_eq_int(json_null, parser.getResult()->getType(), __LINE__);
+    expect_eq(PARSE_OK, parser.parse("null"), __LINE__);
+    expect_eq(json_null, parser.getResult().getType(), __LINE__);
 }
 
 void test_parse_true()
 {
     jsonParser parser;
-    expect_eq_int(PARSE_OK, parser.parse("true"), __LINE__);
-    expect_eq_int(json_true, parser.getResult()->getType(), __LINE__);
+    expect_eq(PARSE_OK, parser.parse("true"), __LINE__);
+    expect_eq(json_true, parser.getResult().getType(), __LINE__);
 }
 
 void test_parse_false()
 {
     jsonParser parser;
-    expect_eq_int(PARSE_OK, parser.parse("false"), __LINE__);
-    expect_eq_int(json_false, parser.getResult()->getType(), __LINE__);
+    expect_eq(PARSE_OK, parser.parse("false"), __LINE__);
+    expect_eq(json_false, parser.getResult().getType(), __LINE__);
 }
 
 void test_parse_number()
@@ -90,6 +89,19 @@ void test_parse_number()
     test_number(1.7976931348623157e+308, "1.7976931348623157e+308", __LINE__); /* Max double */
     test_number(-1.7976931348623157e+308, "-1.7976931348623157e+308", __LINE__);
     test_number(1.0000000000000002, "1.0000000000000002", __LINE__);
+}
+
+void test_parse_string()
+{
+    test_string("", "\"\"", __LINE__);
+    test_string("Hello", "\"Hello\"", __LINE__);
+    test_string("Hello\nWorld", "\"Hello\\nWorld\"", __LINE__);
+    test_string("\" \\ / \b \f \n \r \t", "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\"", __LINE__);
+    test_string("\x24", "\"\\u0024\"", __LINE__);                    /* Dollar sign U+0024 */
+    test_string("\xC2\xA2", "\"\\u00A2\"", __LINE__);                /* Cents sign U+00A2 */
+    test_string("\xE2\x82\xAC", "\"\\u20AC\"", __LINE__);            /* Euro sign U+20AC */
+    test_string("\xF0\x9D\x84\x9E", "\"\\uD834\\uDD1E\"", __LINE__); /* G clef sign U+1D11E */
+    test_string("\xF0\x9D\x84\x9E", "\"\\ud834\\udd1e\"", __LINE__); /* G clef sign U+1D11E */
 }
 
 void test_parse_expect_value()
@@ -131,16 +143,69 @@ void test_parse_number_too_big()
     test_error(PARSE_NUMBER_TOO_BIG, "-1e309", __LINE__);
 }
 
+void test_parse_miss_quotation_mark()
+{
+    test_error(PARSE_MISS_QUOTATION_MARK, "\"", __LINE__);
+    test_error(PARSE_MISS_QUOTATION_MARK, "\"abc", __LINE__);
+}
+
+void test_parse_invalid_string_escape()
+{
+    test_error(PARSE_INVALID_STRING_ESCAPE, "\"\\v\"", __LINE__);
+    test_error(PARSE_INVALID_STRING_ESCAPE, "\"\\'\"", __LINE__);
+    test_error(PARSE_INVALID_STRING_ESCAPE, "\"\\0\"", __LINE__);
+    test_error(PARSE_INVALID_STRING_ESCAPE, "\"\\x12\"", __LINE__);
+}
+
+void test_parse_invalid_string_char()
+{
+    test_error(PARSE_INVALID_STRING_CHAR, "\"\x01\"", __LINE__);
+    test_error(PARSE_INVALID_STRING_CHAR, "\"\x1F\"", __LINE__);
+}
+
+void test_parse_invalid_unicode_hex()
+{
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u0\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u01\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u012\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u/000\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\uG000\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u0/00\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u0G00\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u00/0\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u00G0\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u000/\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u000G\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_HEX, "\"\\u 123\"", __LINE__);
+}
+
+void test_parse_invalid_unicode_surrogate()
+{
+    test_error(PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_SURROGATE, "\"\\uDBFF\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\\\\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uDBFF\"", __LINE__);
+    test_error(PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uE000\"", __LINE__);
+}
+
 void test_parser()
 {
     test_parse_null();
     test_parse_true();
     test_parse_false();
+    test_parse_number();
+    test_parse_string();
+
     test_parse_expect_value();
     test_parse_invalid_value();
     test_parse_root_not_singular();
-    test_parse_number();
     test_parse_number_too_big();
+    test_parse_invalid_string_char();
+    test_parse_invalid_string_escape();
+    test_parse_miss_quotation_mark();
+    test_parse_invalid_unicode_hex();
+    test_parse_invalid_unicode_surrogate();
 }
 int main()
 {

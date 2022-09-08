@@ -2,7 +2,6 @@
 #define PARSER_HPP
 #include "content.hpp"
 #include "tools.hpp"
-using std::string;
 
 class jsonParser
 {
@@ -12,16 +11,17 @@ class jsonParser
 
 protected:
     void parse_whitespace();
-    parseResult parse_null();
-    parseResult parse_false();
-    parseResult parse_true();
+    parseResult parse_literals(const string &, jsonType);
     parseResult parse_number();
     parseResult parse_value();
+    parseResult parse_string();
+    unsigned parse_hex4();
 
 public:
     parseResult parse(const string &);
-    jsonContent *getResult() { return &res; }
+    jsonContent &getResult() { return res; }
     void clear();
+    ~jsonParser() { clear(); }
 };
 
 #endif
