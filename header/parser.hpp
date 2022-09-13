@@ -15,6 +15,7 @@ protected:
     parseResult parse_number();
     parseResult parse_value();
     parseResult parse_string();
+    parseResult parse_array();
     unsigned parse_hex4();
 
 public:

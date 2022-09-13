@@ -70,6 +70,48 @@ parseResult jsonParser::parse_number()
     return PARSE_OK;
 }
 
+parseResult jsonParser::parse_array()
+{
+    EXPECT('[', text[prs_i++]);
+    parse_whitespace();
+    vector<jsonContent> vec_jC;
+    if (text[prs_i] == ']')
+    {
+        res.setArray(vec_jC);
+        ++prs_i;
+        return PARSE_OK;
+    }
+
+    parseResult ret;
+    while (1)
+    {
+        if ((ret = parse_value()) != PARSE_OK)
+        {
+            break;
+        }
+        vec_jC.emplace_back(res);
+        parse_whitespace();
+        if (text[prs_i] == ']')
+        {
+            res.setArray(vec_jC);
+            ret = PARSE_OK;
+            ++prs_i;
+            break;
+        }
+        else if (text[prs_i] == ',')
+        {
+            ++prs_i;
+            parse_whitespace();
+        }
+        else
+        {
+            ret = PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
+            break;
+        }
+    }
+    return ret;
+}
+
 parseResult jsonParser::parse_string()
 {
     EXPECT('\"', text[prs_i]);
@@ -179,6 +221,8 @@ parseResult jsonParser::parse_value()
         return parse_literals("true", json_true);
     case 'f':
         return parse_literals("false", json_false);
+    case '[':
+        return parse_array();
     case '\0':
         return PARSE_EXPECT_VALUE;
     case '\"':

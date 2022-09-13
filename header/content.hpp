@@ -2,14 +2,21 @@
 #define CONTENT_HPP
 
 #include <string>
+#include <vector>
+#include <ostream>
+
+using std::ostream;
 using std::string;
+using std::vector;
+
 enum jsonType
 {
     json_null,
     json_true,
     json_false,
     json_number,
-    json_string
+    json_string,
+    json_array
 };
 
 class jsonContent
@@ -18,28 +25,28 @@ class jsonContent
     union valUnionPtr {
         double *num;
         std::string *str;
+        vector<jsonContent> *arr;
     } vp;
 
 public:
     jsonContent() : type(json_null) {}
+    jsonContent(const jsonContent &);
     ~jsonContent() { clear(); }
 
+    jsonContent &operator=(const jsonContent &);
+    friend bool operator==(const jsonContent &, const jsonContent &);
+    friend ostream &operator<<(ostream &, const jsonContent &);
+
     void setType(const jsonType t) { type = t; }
-    void setNumber(const double d)
-    {
-        vp.num = new double(d);
-        setType(json_number);
-    }
-    void setString(const string &s)
-    {
-        vp.str = new string(s);
-        setType(json_string);
-    }
+    void setNumber(const double d);
+    void setString(const string &s);
+    void setArray(const vector<jsonContent> &a);
 
     jsonType getType() const { return type; }
-    double getNum() const { return *vp.num; }
-    string getStr() const { return *vp.str; }
-    inline void clear();
+    double &getNum() const { return *vp.num; }
+    string &getStr() const { return *vp.str; }
+    vector<jsonContent> &getArr() const { return *vp.arr; }
+    void clear();
 };
 
 enum parseResult
@@ -53,21 +60,8 @@ enum parseResult
     PARSE_INVALID_STRING_ESCAPE,
     PARSE_INVALID_STRING_CHAR,
     PARSE_INVALID_UNICODE_HEX,
-    PARSE_INVALID_UNICODE_SURROGATE
+    PARSE_INVALID_UNICODE_SURROGATE,
+    PARSE_MISS_COMMA_OR_SQUARE_BRACKET
 };
-
-void jsonContent::clear()
-{
-    if (type == json_number && vp.num)
-    {
-        delete vp.num;
-    }
-    else if (type == json_string && vp.str)
-    {
-        delete vp.str;
-    }
-
-    type = json_null;
-}
 
 #endif

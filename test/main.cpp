@@ -19,7 +19,7 @@ void expect_eq(const T &expect, const T &test, int callerLine)
         std::cerr << __FILE__ << " : line " << callerLine << " :\n\texpect: " << expect << ",actual: " << test << "\n";
 }
 
-void test_number(double expect, const string &jsonText, int callerLine)
+void test_number(const double expect, const string &jsonText, int callerLine)
 {
     jsonParser parser;
     expect_eq(PARSE_OK, parser.parse(jsonText), callerLine);
@@ -35,7 +35,7 @@ void test_string(const string &expect, const string &jsonText, int callerLine)
     expect_eq(json_string, parser.getResult().getType(), callerLine);
     expect_eq(expect, parser.getResult().getStr(), callerLine);
 }
-void test_error(parseResult expect, const string &text, int callerLine)
+void test_error(const parseResult expect, const string &text, int callerLine)
 {
     jsonParser parser;
     expect_eq(expect, parser.parse(text), callerLine);
@@ -102,6 +102,46 @@ void test_parse_string()
     test_string("\xE2\x82\xAC", "\"\\u20AC\"", __LINE__);            /* Euro sign U+20AC */
     test_string("\xF0\x9D\x84\x9E", "\"\\uD834\\uDD1E\"", __LINE__); /* G clef sign U+1D11E */
     test_string("\xF0\x9D\x84\x9E", "\"\\ud834\\udd1e\"", __LINE__); /* G clef sign U+1D11E */
+}
+
+void test_parse_array()
+{
+    jsonParser parser;
+    expect_eq(PARSE_OK, parser.parse("[ ]"), __LINE__);
+    expect_eq(json_array, parser.getResult().getType(), __LINE__);
+    const vector<jsonContent> &vec1 = parser.getResult().getArr();
+    expect_eq(true, vec1.empty(), __LINE__);
+    parser.clear();
+
+    expect_eq(PARSE_OK, parser.parse("[ null , false , true , 123 , \"abc\" ]"), __LINE__);
+    expect_eq(json_array, parser.getResult().getType(), __LINE__);
+    const vector<jsonContent> &vec2 = parser.getResult().getArr();
+    expect_eq(size_t(5), vec2.size(), __LINE__);
+    expect_eq(json_null, vec2[0].getType(), __LINE__);
+    expect_eq(json_false, vec2[1].getType(), __LINE__);
+    expect_eq(json_true, vec2[2].getType(), __LINE__);
+    expect_eq(json_number, vec2[3].getType(), __LINE__);
+    expect_eq(123.0, vec2[3].getNum(), __LINE__);
+    expect_eq(json_string, vec2[4].getType(), __LINE__);
+    expect_eq(string("abc"), vec2[4].getStr(), __LINE__);
+    parser.clear();
+
+    expect_eq(PARSE_OK, parser.parse("[ [ ] , [ 0 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]"), __LINE__);
+    expect_eq(json_array, parser.getResult().getType(), __LINE__);
+    const vector<jsonContent> &vec3 = parser.getResult().getArr();
+    expect_eq(size_t(4), vec3.size(), __LINE__);
+    for (size_t i = 0; i < vec3.size(); ++i)
+    {
+        expect_eq(json_array, vec3[i].getType(), __LINE__);
+        const vector<jsonContent> &vec3s = vec3[i].getArr();
+        expect_eq(size_t(i), vec3s.size(), __LINE__);
+        for (size_t j = 0; j < vec3s.size(); ++j)
+        {
+            expect_eq(json_number, vec3s[j].getType(), __LINE__);
+            expect_eq(double(j), vec3s[j].getNum(), __LINE__);
+        }
+    }
+    parser.clear();
 }
 
 void test_parse_expect_value()
@@ -196,6 +236,7 @@ void test_parser()
     test_parse_false();
     test_parse_number();
     test_parse_string();
+    test_parse_array();
 
     test_parse_expect_value();
     test_parse_invalid_value();
