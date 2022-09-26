@@ -1,4 +1,6 @@
 #include "content.hpp"
+#include <iostream>
+
 jsonContent::jsonContent(const jsonContent &src)
 {
     type = src.getType();
@@ -14,6 +16,10 @@ jsonContent::jsonContent(const jsonContent &src)
     {
         setArray(src.getArr());
     }
+    else if (type == json_object)
+    {
+        setObject(src.getObj());
+    }
 }
 
 void jsonContent::setNumber(const double d)
@@ -28,10 +34,16 @@ void jsonContent::setString(const string &s)
     setType(json_string);
 }
 
-void jsonContent::setArray(const vector<jsonContent> &a)
+void jsonContent::setArray(const jsType_Arr &a)
 {
-    vp.arr = new vector<jsonContent>(a);
+    vp.arr = new jsType_Arr(a);
     setType(json_array);
+}
+
+void jsonContent::setObject(const jsType_Obj &o)
+{
+    vp.obj = new jsType_Obj(o);
+    setType(json_object);
 }
 
 void jsonContent::clear()
@@ -48,6 +60,13 @@ void jsonContent::clear()
     {
         vp.arr->clear();
         delete vp.arr;
+    }
+    else if (type == json_object && vp.obj)
+    {
+
+        for (auto iter = vp.obj->begin(); iter != vp.obj->end(); ++iter)
+            iter->second.clear();
+        delete vp.obj;
     }
     type = json_null;
 }
@@ -70,6 +89,10 @@ jsonContent &jsonContent::operator=(const jsonContent &src)
     {
         setArray(src.getArr());
     }
+    else if (type == json_object)
+    {
+        setObject(src.getObj());
+    }
     return *this;
 }
 
@@ -89,6 +112,10 @@ bool operator==(const jsonContent &lhs, const jsonContent &rhs)
     else if (type == json_array)
     {
         return *lhs.vp.arr == *rhs.vp.arr;
+    }
+    else if (type == json_object)
+    {
+        return *lhs.vp.obj == *rhs.vp.obj;
     }
     return false;
 }
@@ -111,9 +138,26 @@ ostream &operator<<(ostream &os, const jsonContent &src)
         for (int i = 0; i < src.getArr().size(); ++i)
         {
             operator<<(os, src.getArr().at(i));
-            os << '\n';
+            if (i != src.getArr().size())
+                os << ',';
+            os << "\n";
         }
-        os << "]\n";
+        os << "]";
     }
+    else if (type == json_object)
+    {
+        os << "{\n";
+        jsType_Obj &object = src.getObj();
+        for (auto iter = object.begin(); iter != object.end(); ++iter)
+        {
+            os << "\t" << iter->first << ":";
+            operator<<(os, iter->second);
+            if (iter != object.end())
+                os << ',';
+            os << "\n";
+        }
+        os << "}";
+    }
+
     return os;
 }

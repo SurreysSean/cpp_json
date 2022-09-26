@@ -3,6 +3,7 @@
 #include <cstring>
 #include <climits>
 
+#include "content.hpp"
 #include "parser.hpp"
 
 int pass_count = 0;
@@ -109,13 +110,13 @@ void test_parse_array()
     jsonParser parser;
     expect_eq(PARSE_OK, parser.parse("[ ]"), __LINE__);
     expect_eq(json_array, parser.getResult().getType(), __LINE__);
-    const vector<jsonContent> &vec1 = parser.getResult().getArr();
+    const jsType_Arr &vec1 = parser.getResult().getArr();
     expect_eq(true, vec1.empty(), __LINE__);
     parser.clear();
 
     expect_eq(PARSE_OK, parser.parse("[ null , false , true , 123 , \"abc\" ]"), __LINE__);
     expect_eq(json_array, parser.getResult().getType(), __LINE__);
-    const vector<jsonContent> &vec2 = parser.getResult().getArr();
+    const jsType_Arr &vec2 = parser.getResult().getArr();
     expect_eq(size_t(5), vec2.size(), __LINE__);
     expect_eq(json_null, vec2[0].getType(), __LINE__);
     expect_eq(json_false, vec2[1].getType(), __LINE__);
@@ -128,12 +129,12 @@ void test_parse_array()
 
     expect_eq(PARSE_OK, parser.parse("[ [ ] , [ 0 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]"), __LINE__);
     expect_eq(json_array, parser.getResult().getType(), __LINE__);
-    const vector<jsonContent> &vec3 = parser.getResult().getArr();
+    const jsType_Arr &vec3 = parser.getResult().getArr();
     expect_eq(size_t(4), vec3.size(), __LINE__);
     for (size_t i = 0; i < vec3.size(); ++i)
     {
         expect_eq(json_array, vec3[i].getType(), __LINE__);
-        const vector<jsonContent> &vec3s = vec3[i].getArr();
+        const jsType_Arr &vec3s = vec3[i].getArr();
         expect_eq(size_t(i), vec3s.size(), __LINE__);
         for (size_t j = 0; j < vec3s.size(); ++j)
         {
@@ -142,6 +143,70 @@ void test_parse_array()
         }
     }
     parser.clear();
+}
+
+void test_parse_object()
+{
+    jsonParser parser;
+    expect_eq(PARSE_OK, parser.parse("{ }"), __LINE__);
+    expect_eq(json_object, parser.getResult().getType(), __LINE__);
+    expect_eq(true, parser.getResult().getObj().empty(), __LINE__);
+    parser.clear();
+
+    expect_eq(PARSE_OK, parser.parse(" { \
+                                     \"n\" : null , \
+                                     \"f\" : false , \
+                                     \"t\" : true , \
+                                     \"i\" : 123 , \
+                                     \"s\" : \"abc\", \
+                                     \"a\" : [ 1, 2, 3 ],\
+                                     \"o\" : { \"1\" : 1, \"2\" : 2, \"3\" : 3 }\
+                                    } "),
+              __LINE__);
+    expect_eq(json_object, parser.getResult().getType(), __LINE__);
+    const jsType_Obj &obj1 = parser.getResult().getObj();
+    expect_eq<size_t>(7, obj1.size(), __LINE__);
+
+    expect_eq(true, obj1.find("n") != obj1.end(), __LINE__);
+    expect_eq(json_null, obj1.at("n").getType(), __LINE__);
+
+    expect_eq(true, obj1.find("t") != obj1.end(), __LINE__);
+    expect_eq(json_true, obj1.at("t").getType(), __LINE__);
+
+    expect_eq(true, obj1.find("f") != obj1.end(), __LINE__);
+    expect_eq(json_false, obj1.at("f").getType(), __LINE__);
+
+    expect_eq(true, obj1.find("i") != obj1.end(), __LINE__);
+    expect_eq(json_number, obj1.at("i").getType(), __LINE__);
+    expect_eq(123.0, obj1.at("i").getNum(), __LINE__);
+
+    expect_eq(true, obj1.find("s") != obj1.end(), __LINE__);
+    expect_eq(json_string, obj1.at("s").getType(), __LINE__);
+    expect_eq(string("abc"), obj1.at("s").getStr(), __LINE__);
+
+    expect_eq(true, obj1.find("a") != obj1.end(), __LINE__);
+    expect_eq(json_array, obj1.at("a").getType(), __LINE__);
+    const jsType_Arr elem6 = obj1.at("a").getArr();
+    expect_eq<size_t>(3, elem6.size(), __LINE__);
+    for (int i = 0; i < 3; ++i)
+    {
+        expect_eq(json_number, elem6[i].getType(), __LINE__);
+        expect_eq<double>(i + 1, elem6[i].getNum(), __LINE__);
+    }
+
+    expect_eq(true, obj1.find("o") != obj1.end(), __LINE__);
+    expect_eq(json_object, obj1.at("o").getType(), __LINE__);
+    jsType_Obj &elem7 = obj1.at("o").getObj();
+    expect_eq<size_t>(3, elem7.size(), __LINE__);
+    for (int i = 0; i < 3; ++i)
+    {
+        char c = '1' + i;
+        string temp;
+        temp += c;
+        expect_eq(true, elem7.find(temp) != elem7.end(), __LINE__);
+        expect_eq(json_number, elem7.at(temp).getType(), __LINE__);
+        expect_eq<double>(i + 1, elem7.at(temp).getNum(), __LINE__);
+    }
 }
 
 void test_parse_expect_value()
@@ -165,6 +230,9 @@ void test_parse_invalid_value()
     test_error(PARSE_INVALID_VALUE, "inf", __LINE__);
     test_error(PARSE_INVALID_VALUE, "NAN", __LINE__);
     test_error(PARSE_INVALID_VALUE, "nan", __LINE__);
+
+    test_error(PARSE_INVALID_VALUE, "[1,]", __LINE__);
+    test_error(PARSE_INVALID_VALUE, "[\"a\", nul]", __LINE__);
 }
 
 void test_parse_root_not_singular()
@@ -229,6 +297,39 @@ void test_parse_invalid_unicode_surrogate()
     test_error(PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uE000\"", __LINE__);
 }
 
+void test_parse_miss_comma_or_square_bracket()
+{
+    test_error(PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1", __LINE__);
+    test_error(PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1}", __LINE__);
+    test_error(PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1 2", __LINE__);
+    test_error(PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[[]", __LINE__);
+}
+void test_parse_miss_key()
+{
+    test_error(PARSE_MISS_KEY, "{:1,", __LINE__);
+    test_error(PARSE_MISS_KEY, "{1:1,", __LINE__);
+    test_error(PARSE_MISS_KEY, "{true:1,", __LINE__);
+    test_error(PARSE_MISS_KEY, "{false:1,", __LINE__);
+    test_error(PARSE_MISS_KEY, "{null:1,", __LINE__);
+    test_error(PARSE_MISS_KEY, "{[]:1,", __LINE__);
+    test_error(PARSE_MISS_KEY, "{{}:1,", __LINE__);
+    test_error(PARSE_MISS_KEY, "{\"a\":1,", __LINE__);
+}
+
+void test_parse_miss_colon()
+{
+    test_error(PARSE_MISS_COLON, "{\"a\"}", __LINE__);
+    test_error(PARSE_MISS_COLON, "{\"a\",\"b\"}", __LINE__);
+}
+
+void test_parse_miss_comma_or_curly_bracket()
+{
+    test_error(PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":1", __LINE__);
+    test_error(PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":1]", __LINE__);
+    test_error(PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":1 \"b\"", __LINE__);
+    test_error(PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":{}", __LINE__);
+}
+
 void test_parser()
 {
     test_parse_null();
@@ -237,6 +338,7 @@ void test_parser()
     test_parse_number();
     test_parse_string();
     test_parse_array();
+    test_parse_object();
 
     test_parse_expect_value();
     test_parse_invalid_value();
@@ -247,6 +349,10 @@ void test_parser()
     test_parse_miss_quotation_mark();
     test_parse_invalid_unicode_hex();
     test_parse_invalid_unicode_surrogate();
+    test_parse_miss_comma_or_curly_bracket();
+    test_parse_miss_comma_or_square_bracket();
+    test_parse_miss_key();
+    test_parse_miss_colon();
 }
 int main()
 {

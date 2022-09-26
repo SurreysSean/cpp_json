@@ -12,7 +12,7 @@ void jsonParser::parse_whitespace()
 
 parseResult jsonParser::parse_literals(const string &expectStr, jsonType expectType)
 {
-    EXPECT(text[prs_i], expectStr[0]);
+    // EXPECT(text[prs_i], expectStr[0]);
     const size_t len = expectStr.size();
     if (text.substr(prs_i, len) != expectStr)
     {
@@ -70,59 +70,16 @@ parseResult jsonParser::parse_number()
     return PARSE_OK;
 }
 
-parseResult jsonParser::parse_array()
+parseResult jsonParser::parse_string_raw(string &str_res)
 {
-    EXPECT('[', text[prs_i++]);
-    parse_whitespace();
-    vector<jsonContent> vec_jC;
-    if (text[prs_i] == ']')
-    {
-        res.setArray(vec_jC);
-        ++prs_i;
-        return PARSE_OK;
-    }
-
-    parseResult ret;
-    while (1)
-    {
-        if ((ret = parse_value()) != PARSE_OK)
-        {
-            break;
-        }
-        vec_jC.emplace_back(res);
-        parse_whitespace();
-        if (text[prs_i] == ']')
-        {
-            res.setArray(vec_jC);
-            ret = PARSE_OK;
-            ++prs_i;
-            break;
-        }
-        else if (text[prs_i] == ',')
-        {
-            ++prs_i;
-            parse_whitespace();
-        }
-        else
-        {
-            ret = PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
-            break;
-        }
-    }
-    return ret;
-}
-
-parseResult jsonParser::parse_string()
-{
-    EXPECT('\"', text[prs_i]);
+    // EXPECT('\"', text[prs_i]);
+    str_res.clear();
     ++prs_i;
-    string resStr;
     for (; prs_i != text.size(); ++prs_i)
     {
         switch (text[prs_i])
         {
         case '\"':
-            res.setString(resStr);
             ++prs_i;
             return PARSE_OK;
         case '\\':
@@ -130,28 +87,28 @@ parseResult jsonParser::parse_string()
             switch (text[prs_i])
             {
             case '\\':
-                resStr += '\\';
+                str_res += '\\';
                 break;
             case '\"':
-                resStr += '\"';
+                str_res += '\"';
                 break;
             case '/':
-                resStr += '/';
+                str_res += '/';
                 break;
             case 'r':
-                resStr += '\r';
+                str_res += '\r';
                 break;
             case 'b':
-                resStr += '\b';
+                str_res += '\b';
                 break;
             case 'n':
-                resStr += '\n';
+                str_res += '\n';
                 break;
             case 'f':
-                resStr += '\f';
+                str_res += '\f';
                 break;
             case 't':
-                resStr += '\t';
+                str_res += '\t';
                 break;
             case 'u':
                 unsigned u, u1;
@@ -173,7 +130,7 @@ parseResult jsonParser::parse_string()
                         return PARSE_INVALID_UNICODE_SURROGATE;
                     u = (((u - 0xD800) << 10) | (u1 - 0xDC00)) + 0x10000;
                 }
-                resStr += encode_utf8(u);
+                str_res += encode_utf8(u);
                 break;
             default:
                 return PARSE_INVALID_STRING_ESCAPE;
@@ -183,10 +140,19 @@ parseResult jsonParser::parse_string()
         default:
             if (text[prs_i] < 0x20)
                 return PARSE_INVALID_STRING_CHAR;
-            resStr += text[prs_i];
+            str_res += text[prs_i];
         }
     }
     return PARSE_MISS_QUOTATION_MARK;
+}
+
+parseResult jsonParser::parse_string()
+{
+    string resStr;
+    parseResult ret;
+    if ((ret = parse_string_raw(resStr)) == PARSE_OK)
+        res.setString(resStr);
+    return ret;
 }
 
 unsigned jsonParser::parse_hex4()
@@ -210,6 +176,84 @@ unsigned jsonParser::parse_hex4()
     prs_i += 3;
     return utfRes;
 }
+parseResult jsonParser::parse_array()
+{
+    // EXPECT('[', text[prs_i]);
+    ++prs_i;
+    parse_whitespace();
+    jsType_Arr vec_jC;
+    parseResult ret;
+
+    while (text[prs_i] != ']')
+    {
+        if ((ret = parse_value()) != PARSE_OK)
+        {
+            return ret;
+        }
+        vec_jC.emplace_back(res);
+        res.clear();
+        parse_whitespace();
+
+        if (text[prs_i] == ',')
+        {
+            ++prs_i;
+            parse_whitespace();
+            if (text[prs_i] == ']')
+                return PARSE_INVALID_VALUE;
+        }
+        else if (text[prs_i] != ']')
+        {
+            return PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
+        }
+    }
+    res.setArray(vec_jC);
+    ++prs_i;
+    return PARSE_OK;
+}
+
+parseResult jsonParser::parse_object()
+{
+    EXPECT('{', text[prs_i]);
+    ++prs_i;
+    parse_whitespace();
+    jsType_Obj map;
+    string tempKey;
+    parseResult ret;
+    while (text[prs_i] != '}')
+    {
+        if (text[prs_i] != '\"')
+            return PARSE_MISS_KEY;
+        if ((ret = parse_string_raw(tempKey)) != PARSE_OK)
+            return ret;
+        parse_whitespace();
+
+        if (text[prs_i] != ':')
+            return PARSE_MISS_COLON;
+        ++prs_i;
+        parse_whitespace();
+        if ((ret = parse_value()) != PARSE_OK)
+            return ret;
+        map[tempKey] = res;
+        res.clear();
+        parse_whitespace();
+
+        if (text[prs_i] == ',')
+        {
+            ++prs_i;
+            parse_whitespace();
+            if (text[prs_i] == '}')
+                return PARSE_INVALID_VALUE;
+        }
+        else if (text[prs_i] != '}')
+        {
+            return PARSE_MISS_COMMA_OR_CURLY_BRACKET;
+        }
+    }
+
+    res.setObject(map);
+    ++prs_i;
+    return PARSE_OK;
+}
 
 parseResult jsonParser::parse_value()
 {
@@ -223,10 +267,12 @@ parseResult jsonParser::parse_value()
         return parse_literals("false", json_false);
     case '[':
         return parse_array();
-    case '\0':
-        return PARSE_EXPECT_VALUE;
+    case '{':
+        return parse_object();
     case '\"':
         return parse_string();
+    case '\0':
+        return PARSE_EXPECT_VALUE;
     default:
         return parse_number();
     }

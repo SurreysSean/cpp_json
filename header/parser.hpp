@@ -9,6 +9,9 @@ class jsonParser
     int prs_i;
     jsonContent res;
 
+    unsigned parse_hex4();
+    parseResult parse_string_raw(string &);
+
 protected:
     void parse_whitespace();
     parseResult parse_literals(const string &, jsonType);
@@ -16,7 +19,7 @@ protected:
     parseResult parse_value();
     parseResult parse_string();
     parseResult parse_array();
-    unsigned parse_hex4();
+    parseResult parse_object();
 
 public:
     parseResult parse(const string &);
