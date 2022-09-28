@@ -1,5 +1,4 @@
 #include "tools.hpp"
-#include <iostream>
 
 bool is_whitespace(const char &c)
 {
@@ -37,4 +36,12 @@ string encode_utf8(unsigned u)
         utf8_char += 0x80 | (u & 0x3F);
     }
     return utf8_char;
+}
+
+string multiIndex(const int x)
+{
+    string tmp;
+    for (int i = 0; i < x; ++i)
+        tmp += oneIndex;
+    return tmp;
 }

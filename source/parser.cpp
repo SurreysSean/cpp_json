@@ -1,5 +1,4 @@
 #include "parser.hpp"
-#include <iostream>
 #include <stdexcept>
 
 void jsonParser::parse_whitespace()

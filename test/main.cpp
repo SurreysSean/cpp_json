@@ -5,6 +5,7 @@
 
 #include "content.hpp"
 #include "parser.hpp"
+#include "generator.hpp"
 
 int pass_count = 0;
 int test_count = 0;
@@ -354,9 +355,78 @@ void test_parser()
     test_parse_miss_key();
     test_parse_miss_colon();
 }
+
+void test_generator()
+{
+    jsonParser parser;
+    jsonGenerator generator;
+    expect_eq(PARSE_OK, parser.parse(" { \
+                                     \"n\" : null , \
+                                     \"f\" : false , \
+                                     \"t\" : true , \
+                                     \"i\" : 123 , \
+                                     \"s\" : \"abc\", \
+                                     \"a\" : [ 1, 2, 3 ],\
+                                     \"o\" : { \"1\" : 1, \"2\" : 2, \"3\" : 3 }\
+                                    } "),
+              __LINE__);
+    generator.generate(parser.getResult());
+    parser.clear();
+    expect_eq(PARSE_OK, parser.parse(generator.getResult()), __LINE__);
+
+    expect_eq(json_object, parser.getResult().getType(), __LINE__);
+    const jsType_Obj &obj1 = parser.getResult().getObj();
+    expect_eq<size_t>(7, obj1.size(), __LINE__);
+
+    expect_eq(true, obj1.find("n") != obj1.end(), __LINE__);
+    expect_eq(json_null, obj1.at("n").getType(), __LINE__);
+
+    expect_eq(true, obj1.find("t") != obj1.end(), __LINE__);
+    expect_eq(json_true, obj1.at("t").getType(), __LINE__);
+
+    expect_eq(true, obj1.find("f") != obj1.end(), __LINE__);
+    expect_eq(json_false, obj1.at("f").getType(), __LINE__);
+
+    expect_eq(true, obj1.find("i") != obj1.end(), __LINE__);
+    expect_eq(json_number, obj1.at("i").getType(), __LINE__);
+    expect_eq(123.0, obj1.at("i").getNum(), __LINE__);
+
+    expect_eq(true, obj1.find("s") != obj1.end(), __LINE__);
+    expect_eq(json_string, obj1.at("s").getType(), __LINE__);
+    expect_eq(string("abc"), obj1.at("s").getStr(), __LINE__);
+
+    expect_eq(true, obj1.find("a") != obj1.end(), __LINE__);
+    expect_eq(json_array, obj1.at("a").getType(), __LINE__);
+    const jsType_Arr elem6 = obj1.at("a").getArr();
+    expect_eq<size_t>(3, elem6.size(), __LINE__);
+    for (int i = 0; i < 3; ++i)
+    {
+        expect_eq(json_number, elem6[i].getType(), __LINE__);
+        expect_eq<double>(i + 1, elem6[i].getNum(), __LINE__);
+    }
+
+    expect_eq(true, obj1.find("o") != obj1.end(), __LINE__);
+    expect_eq(json_object, obj1.at("o").getType(), __LINE__);
+    jsType_Obj &elem7 = obj1.at("o").getObj();
+    expect_eq<size_t>(3, elem7.size(), __LINE__);
+    for (int i = 0; i < 3; ++i)
+    {
+        char c = '1' + i;
+        string temp;
+        temp += c;
+        expect_eq(true, elem7.find(temp) != elem7.end(), __LINE__);
+        expect_eq(json_number, elem7.at(temp).getType(), __LINE__);
+        expect_eq<double>(i + 1, elem7.at(temp).getNum(), __LINE__);
+    }
+    std::cout << generator.getResult() << std::endl;
+    std::cout << std::endl;
+    std::cout << generator.getFormatResult() << std::endl;
+}
+
 int main()
 {
     test_parser();
+    test_generator();
     printf("total %d, pass %d\n", test_count, pass_count);
     return 0;
 }
