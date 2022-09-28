@@ -3,9 +3,7 @@
 #include <cstring>
 #include <climits>
 
-#include "content.hpp"
-#include "parser.hpp"
-#include "generator.hpp"
+#include "mini_cppjson.hpp"
 
 int pass_count = 0;
 int test_count = 0;
